@@ -6,6 +6,7 @@
  *   - 各フィールドは `data-field-code` 属性で識別し、該当要素を削除する
  * 作成者: fujimakiaya
  * 作成日: 2025-12-06
+ * version: v1.01
  */
 
 // *** kViewer event - record.show ***
