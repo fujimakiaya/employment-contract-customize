@@ -5,7 +5,7 @@
  * @date 2025-02-07
  * @description このスクリプトは以下の動きをする
  * - 管理者ユーザーのメールアドレスを取得し、担当者メールアドレス_toおよび_ccフィールドにドロップダウンリストとして設定
- * 
+ *
  * 更新履歴:
  * - 2025-12-06 [fujimaki] 初版作成
  *  */
@@ -26,9 +26,14 @@ async function add_manager_dropdown() {
         value: ["有効", "存続"],
       },
       {
-        key: "契約ステータス",
-        operator: "!=",
-        value: "解約済", // グループ親会社番号が同じ人をセレクション
+        key: "ユーザー権限フラグ",
+        operator: "in",
+        value: ["雇用契約関連"],
+      },
+      {
+        key: "マイページ2_5",
+        operator: "in",
+        value: ["ﾕｰｻﾞｰ"], // グループ親会社番号が同じ人をセレクション
       },
       {
         key: "グループ親会社番号",
@@ -36,7 +41,7 @@ async function add_manager_dropdown() {
         value: COMPANY_ID,
       },
     ],
-    fields: ["ベースmail"],
+    fields: ["mail", "氏名"],
   };
 
   fetch(endpoint3 + "/getRecord", {
@@ -57,11 +62,11 @@ async function add_manager_dropdown() {
       let managerEmails = [];
       data.records.forEach((elem) => {
         const emailObj = {
-          value: elem["ベースmail"].value,
-          code: "",
+          value: elem["mail"].value,
+          code: elem["氏名"].value,
         };
         managerEmail_object.push(emailObj);
-        managerEmails.push(elem["ベースmail"].value);
+        managerEmails.push(elem["mail"].value);
       });
       const AC = new AttributeControl(); //attributeを設定
       const autocompleteList_obj = {
