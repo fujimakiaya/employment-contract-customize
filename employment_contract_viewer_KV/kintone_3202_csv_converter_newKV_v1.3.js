@@ -104,13 +104,13 @@ const MAP = {
 
     const nkrDropdown = create_nkr_dropdown();
     headers.insertBefore(nkrDropdown, headers.firstChild);
-    const dropdown = document.getElementById("nkr-dropdown");
+    // const dropdown = document.getElementById("nkr-dropdown");
     // applyDisplay(dropdown); // 初期表示設定
-    sessionStorage.setItem("filters", JSON.stringify(MAP[dropdown.value]));
-    dropdown.addEventListener("change", () => {
-      // applyFilter(MAP[dropdown.value]);
-      sessionStorage.setItem("filters", JSON.stringify(MAP[dropdown.value]));
-    });
+    // sessionStorage.setItem("filters", JSON.stringify(MAP[dropdown.value]));
+    // dropdown.addEventListener("change", () => {
+    //   // applyFilter(MAP[dropdown.value]);
+    //   sessionStorage.setItem("filters", JSON.stringify(MAP[dropdown.value]));
+    // });
   });
 })();
 

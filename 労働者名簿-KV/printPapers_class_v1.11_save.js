@@ -125,13 +125,13 @@ class ReplaceValue {
         value,
         replace_data,
         cer_name,
-        displayValue
+        displayValue,
       ) {
         let jj;
         try {
           let tablefield_name = replace_data.get(cer_name)["table_field"];
           let table = tablefield_name.map((name) =>
-            name.replace(/^\{%|\%}$/g, "")
+            name.replace(/^\{%|\%}$/g, ""),
           );
           let table_content = displayValue[table[i]].value;
           if (cer_name == "労働者名簿") {
@@ -140,7 +140,7 @@ class ReplaceValue {
               (index) =>
                 index.value &&
                 index.value[flag_name] &&
-                index.value[flag_name].value === "有効"
+                index.value[flag_name].value === "有効",
             );
           }
           if (cer_name == "雇用契約書" || cer_name == "労働条件通知書") {
@@ -149,7 +149,7 @@ class ReplaceValue {
                 index.value &&
                 index.value["手当の額"] &&
                 index.value["手当の額"].value !== "0" &&
-                index.value["手当の額"].value !== ""
+                index.value["手当の額"].value !== "",
             );
           }
           let pp = 0;
@@ -180,7 +180,7 @@ class ReplaceValue {
         value,
         replace_data,
         cer_name,
-        displayValue
+        displayValue,
       ) {
         try {
           let tablefield_name = replace_data.get(cer_name)["table_field"];
@@ -214,7 +214,7 @@ class ReplaceValue {
         value,
         replace_data,
         cer_name,
-        displayValue
+        displayValue,
       ) {
         try {
           let tablefield_name = replace_data.get(cer_name)["table_field"];
@@ -248,7 +248,7 @@ class ReplaceValue {
         value,
         replace_data,
         cer_name,
-        displayValue
+        displayValue,
       ) {
         try {
           let tablefield_name = replace_data.get(cer_name)["table_field"];
@@ -300,7 +300,7 @@ class ReplaceValue {
             this.customer_value,
             this.replace_data,
             cer_name,
-            this.displayValue
+            this.displayValue,
           );
         }
       }
@@ -314,13 +314,13 @@ class ReplaceValue {
     if (ledgerName == "退職証明書") {
       template = template.replace(
         ">%e22%",
-        " id = cssstyle > （別紙の理由による）"
+        " id = cssstyle > （別紙の理由による）",
       );
     }
     for (let i = 0; i < this.replace_value_array.length; i++) {
       template = template.replace(
         this.replace_value_array[i],
-        this.customer_value[i]
+        this.customer_value[i],
       );
     }
     return template;
@@ -366,7 +366,7 @@ class ReplaceValue {
           value: this.companyId,
         },
       ],
-      ["手当表示"]
+      ["手当表示"],
     );
     return relay.RelayGetValueNormal().then((data) => {
       if (data.records.length > 0) {
@@ -389,6 +389,8 @@ class ReplaceValue {
   async replaceInitProcess(ledgerNames) {
     await this.allowanceTable();
     //*** Initialization of printprocess - get 帳票フィールド管理アプリ・データ ***
+    const fieldTable = structuredClone(ledgerNames);
+    if (fieldTable.length < 2) fieldTable.push(" "); //push dummy data
     const relay = new Relay(
       3851,
       [
@@ -400,10 +402,10 @@ class ReplaceValue {
         {
           key: "帳票名",
           operator: "in",
-          value: ledgerNames,
+          value: fieldTable,
         },
       ],
-      ["帳票名", "フィールド管理", "日付の表示方法", "htmファイル"]
+      ["帳票名", "フィールド管理", "日付の表示方法", "htmファイル"],
     );
 
     return relay
@@ -414,7 +416,7 @@ class ReplaceValue {
 
         // ★ ledgerNames のうち不足しているものを特定
         const missingNames = ledgerNames.filter(
-          (name) => !existingNames.includes(name)
+          (name) => !existingNames.includes(name),
         );
 
         // ★不足が無ければ data を返す
@@ -439,7 +441,7 @@ class ReplaceValue {
               value: isSingleMissing ? missingNames[0] : missingNames,
             },
           ],
-          ["帳票名", "フィールド管理", "日付の表示方法", "htmファイル"]
+          ["帳票名", "フィールド管理", "日付の表示方法", "htmファイル"],
         );
 
         const data327 = await relay327.RelayGetValueNormal();
@@ -451,7 +453,7 @@ class ReplaceValue {
         // ★ 不足していた帳票名を sessionStorage に保持
         sessionStorage.setItem(
           "templateMissingNames",
-          JSON.stringify(missingNames)
+          JSON.stringify(missingNames),
         );
         return data;
       })
@@ -520,13 +522,13 @@ class batchPrint {
             new Map(
               latestRecords
                 .flatMap((d) => d.kintoneRecord ?? [])
-                .map((r) => [String(r["$id"]?.value), r])
-            ).values()
+                .map((r) => [String(r["$id"]?.value), r]),
+            ).values(),
           ),
         };
         employeeIds = [
           ...new Set(
-            data.records.map((item) => item["$id"]?.value).filter(Boolean)
+            data.records.map((item) => item["$id"]?.value).filter(Boolean),
           ),
         ];
         break;
@@ -789,7 +791,7 @@ class batchPrint {
       const relayCertification = new Relay(
         informArray[ledgerNames[0]].appId,
         informArray[ledgerNames[0]].query,
-        informArray[ledgerNames[0]].fieldName
+        informArray[ledgerNames[0]].fieldName,
       );
       const batchDatas = await relayCertification.RelayGetValueBatchData();
       let batchData;
@@ -800,7 +802,7 @@ class batchPrint {
         data.records.map(async (record) => {
           const employeeId = record["$id"].value;
           batchData = batchDatas.records?.filter(
-            (rec) => rec["$id"]?.value === employeeId
+            (rec) => rec["$id"]?.value === employeeId,
           );
           makehtmlArray(batchData);
         });
@@ -808,7 +810,7 @@ class batchPrint {
         data.records.map(async (record) => {
           const employeeId = record["社員No"].value;
           batchData = batchDatas.records?.filter(
-            (rec) => rec["社員No"]?.value === employeeId
+            (rec) => rec["社員No"]?.value === employeeId,
           );
           makehtmlArray(batchData);
         });
@@ -839,7 +841,8 @@ class batchPrint {
   }
 }
 
-const ENDPOINT = "https://kintone-relay-api-eidnwbgjma-an.a.run.app";
+const ENDPOINT =
+  "https://kintone-relay-api-light-538321378695.asia-northeast1.run.app/";
 
 //リレーAPIで情報取得 replace_dataを返す
 class Relay {

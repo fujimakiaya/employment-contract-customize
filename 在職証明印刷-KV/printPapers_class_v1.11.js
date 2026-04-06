@@ -163,7 +163,7 @@ class ReplaceValue {
             }
             if (table_content[pp]) {
               let name = table[jj];
-              value[jj] = table_content[pp]?.value?.[name]?.value ?? "";
+              value[jj] = table_content[pp].value[name].value;
             } else if (value[jj]) {
             } else {
               value[jj] = "";
@@ -389,6 +389,8 @@ class ReplaceValue {
   async replaceInitProcess(ledgerNames) {
     await this.allowanceTable();
     //*** Initialization of printprocess - get 帳票フィールド管理アプリ・データ ***
+    const fieldTable = structuredClone(ledgerNames);
+    if (fieldTable.length < 2) fieldTable.push(" "); //push dummy data 
     const relay = new Relay(
       3851,
       [
@@ -400,81 +402,68 @@ class ReplaceValue {
         {
           key: "帳票名",
           operator: "in",
-          value: ledgerNames,
+          value: fieldTable,
         },
       ],
       ["帳票名", "フィールド管理", "日付の表示方法", "htmファイル"]
     );
 
-    return relay
-      .RelayGetValue()
-      .then(async (data) => {
-        // ★ 取得済み帳票名を抽出
-        const existingNames = data.records.map((r) => r["帳票名"].value);
-
-        // ★ ledgerNames のうち不足しているものを特定
-        const missingNames = ledgerNames.filter(
-          (name) => !existingNames.includes(name)
-        );
-
-        // ★不足が無ければ data を返す
-        if (missingNames.length === 0) {
+    return (
+      relay
+        .RelayGetValue()
+        //1208藤巻変更（templateない場合は327取得）
+        .then((data) => {
+          if (data.records.length != ledgerNames.length) {
+        
+            const missingTemplate = [];
+            for (let i=0; i<ledgerNames.length; i++) {
+            //    const find = data.records.find((record) => record["帳票名"].value == ledgerNames[i]);
+            //    if (!find) {
+                    if (ledgerNames[i] != " ") missingTemplate.push(ledgerNames[i]);
+            //    } 
+            }
+            const missingJSON =  JSON.stringify(missingTemplate);
+            sessionStorage.setItem("templateMissingNames", missingJSON);
+            missingTemplate.push(" ");
+            relay.query_params = [
+              {
+                key: "会社レコード番号",
+                operator: "=",
+                value: 327,
+              },
+              {
+                key: "帳票名",
+                operator: "in",
+                value: missingTemplate,
+              },
+            ];
+            return relay.RelayGetValue();
+          }
           return data;
-        }
-        const isSingleMissing = missingNames.length === 1;
-
-        // ★不足が1つの場合（and 雇用契約書が含まれているパターンにも対応）
-        // → 327から必要な帳票だけを取得して “data に追加” する
-        const relay327 = new Relay(
-          3851,
-          [
-            {
-              key: "会社レコード番号",
-              operator: "=",
-              value: 327,
-            },
-            {
-              key: "帳票名",
-              operator: isSingleMissing ? "=" : "in",
-              value: isSingleMissing ? missingNames[0] : missingNames,
-            },
-          ],
-          ["帳票名", "フィールド管理", "日付の表示方法", "htmファイル"]
-        );
-
-        const data327 = await relay327.RelayGetValueNormal();
-
-        // ★ data.records に追加
-        data.records.push(...data327.records);
-        sessionStorage.setItem("getValue1", JSON.stringify(data));
-
-        // ★ 不足していた帳票名を sessionStorage に保持
-        sessionStorage.setItem(
-          "templateMissingNames",
-          JSON.stringify(missingNames)
-        );
-        return data;
-      })
-      .then((data) => {
-        const storedValues = JSON.parse(sessionStorage.getItem("fileValues1"));
-        if (storedValues) {
-          const restoredTemplateArray = new Map(Object.entries(storedValues));
-          return restoredTemplateArray;
-        } else {
-          return relay.FileGetValue(ledgerNames, data);
-        }
-      })
-      .then((fileValues) => {
-        this.template_array = fileValues;
-        return relay.GetRequireValue();
-      })
-      .then((ret_value) => {
-        this.replace_data = ret_value;
-        this.initialized = 1;
-      })
-      .catch((error) => {
-        console.error(error);
-      });
+        })
+        .then((data) => {
+          const storedValues = JSON.parse(
+            sessionStorage.getItem("fileValues1")
+          );
+          if (storedValues) {
+            const restoredTemplateArray = new Map(Object.entries(storedValues));
+            return restoredTemplateArray;
+          } else {
+            return relay.FileGetValue(ledgerNames, data);
+          }
+        })
+        .then((fileValues) => {
+          this.template_array = fileValues;
+          return relay.GetRequireValue();
+        })
+        .then((ret_value) => {
+          this.replace_data = ret_value;
+          this.initialized = 1;
+        })
+        .catch((error) => {
+          console.error(error);
+        })
+    );
   }
 }
 
@@ -486,20 +475,13 @@ class batchPrint {
     this.replace = new ReplaceValue(this.companyId);
   }
 
-  async executeFunction(replace, ledgerNames, filter, latestRecords) {
+  async executeFunction(replace, ledgerNames) {
     let query;
     let relay;
     let data;
     let employeeIds;
-    let operator = "in";
     switch (ledgerNames[0]) {
       case "雇用契約書":
-      case "労働条件通知書":
-        if (Array.isArray(filter) && filter.length === 1) {
-          operator = "=";
-          filter = filter[0];
-        }
-
         //従業員管理アプリから該当の社員No取得
         query = [
           {
@@ -508,27 +490,16 @@ class batchPrint {
             value: this.companyId,
           },
           {
-            key: "$id",
-            operator: operator,
-            value: filter,
+            key: "在籍状況",
+            operator: "in",
+            value: ["在籍中", "休職中", "管理ユーザー"],
           },
         ];
-        // relay = new Relay(3202, query, ["社員No"]);
-        // data = await relay.RelayGetValueReturn();
-        data = {
-          records: Array.from(
-            new Map(
-              latestRecords
-                .flatMap((d) => d.kintoneRecord ?? [])
-                .map((r) => [String(r["$id"]?.value), r])
-            ).values()
-          ),
-        };
-        employeeIds = [
-          ...new Set(
-            data.records.map((item) => item["$id"]?.value).filter(Boolean)
-          ),
-        ];
+        relay = new Relay(3202, query, ["社員No"]);
+        data = await relay.RelayGetValueReturn();
+        employeeIds = data.records.map((item) => item["社員No"].value);
+        //該当社員の情報を全部引っ張ってくる
+        console.log(employeeIds);
         break;
       case "労働者名簿":
         query = [
@@ -549,6 +520,18 @@ class batchPrint {
         employeeIds = data.records.map((item) => item["社員No"].value);
         break;
     }
+    query = [
+      {
+        key: "会社レコード番号",
+        operator: "=",
+        value: this.companyId,
+      },
+      {
+        key: "社員No",
+        operator: "in",
+        value: employeeIds,
+      },
+    ];
     const informArray = {
       労働者名簿: {
         fieldName: [
@@ -574,22 +557,9 @@ class batchPrint {
         ],
         appId: 3218,
         approvalDate: "労働者名簿公開承認日",
-        query: [
-          {
-            key: "会社レコード番号",
-            operator: "=",
-            value: this.companyId,
-          },
-          {
-            key: "社員No",
-            operator: "in",
-            value: employeeIds,
-          },
-        ],
       },
       雇用契約書: {
         fieldName: [
-          "$id",
           "社員No",
           "姓戸籍",
           "名戸籍",
@@ -670,158 +640,55 @@ class batchPrint {
         ],
         appId: 3565,
         approvalDate: "雇用契約書公開承認日",
-        query: [
-          {
-            key: "会社レコード番号",
-            operator: "=",
-            value: this.companyId,
-          },
-          {
-            key: "$id",
-            operator: "in",
-            value: employeeIds,
-          },
-        ],
-      },
-      労働条件通知書: {
-        fieldName: [
-          "$id",
-          "社員No",
-          "姓戸籍",
-          "名戸籍",
-          "入社日",
-          "契約期間",
-          "更新の種類",
-          "契約締結日",
-          "契約開始日",
-          "契約終了日",
-          "試用期間開始日",
-          "試用期間終了日",
-          "雇用形態区分",
-          "就業の場所",
-          "従事すべき業務の内容",
-          "役職",
-          "始業時刻1",
-          "終業時刻1",
-          "始業時刻2",
-          "終業時刻2",
-          "始業時刻3",
-          "終業時刻3",
-          "始業・終業時刻その他",
-          "休憩時間1",
-          "休憩時間2",
-          "休憩時間3",
-          "所定時間外労働の有無",
-          "休日労働",
-          "深夜労働",
-          "休日",
-          "給与形態",
-          "基本賃金額",
-          "手当",
-          "ラベル_賃金締切日1",
-          "賃金締切日当月か翌月か",
-          "賃金締切日",
-          "ラベル_賃金締切日2",
-          "賃金締切日2当月か翌月か",
-          "賃金締切日2",
-          "ラベル_賃金支払日1",
-          "賃金支払日当月か翌月か",
-          "賃金支払日",
-          "ラベル_賃金支払日2",
-          "賃金支払日2当月か翌月か",
-          "賃金支払日2",
-          "賃金支払方法",
-          "労使協定に基づく賃金支払時の控除",
-          "備考1",
-          "昇給の有無",
-          "昇給の時期等",
-          "賞与",
-          "賞与時期等",
-          "退職金",
-          "定年制の有無",
-          "定年制年齢",
-          "継続雇用年齢",
-          "例2か月",
-          "例14",
-          "労災保険の適用",
-          "雇用保険の適用",
-          "健康保険の適用",
-          "厚生年金の適用",
-          "短時間労働者について雇用管理改善等に関する相談窓口_0",
-          "個別特記事項",
-          "就業場所の変更範囲",
-          "業務内容の変更範囲",
-          "就業規則を確認できる場所",
-          "就業規則の確認方法",
-          "契約更新上限の有無",
-          "更新上限回数",
-          "通算契約期間",
-          "契約期間末日の翌日",
-          "労働条件変更の有無",
-          "雇用契約書作成日",
-          "雇用契約書公開承認日",
-          "会社名",
-          "代表者職名",
-          "代表者氏名",
-        ],
-        appId: 3565,
-        approvalDate: "雇用契約書公開承認日",
-        query: [
-          {
-            key: "会社レコード番号",
-            operator: "=",
-            value: this.companyId,
-          },
-          {
-            key: "$id",
-            operator: "in",
-            value: employeeIds,
-          },
-        ],
       },
     };
 
     let displayHtml_join;
     const parser = new DOMParser();
 
-    try {
-      //該当社員Noの全データ取得
-      const relayCertification = new Relay(
-        informArray[ledgerNames[0]].appId,
-        informArray[ledgerNames[0]].query,
-        informArray[ledgerNames[0]].fieldName
+    //該当社員Noの全データ取得
+    const relayCertification = new Relay(
+      informArray[ledgerNames[0]].appId,
+      query,
+      informArray[ledgerNames[0]].fieldName
+    );
+    const batchDatas = await relayCertification.RelayGetValueBatchData();
+    let batchData;
+    data.records.map(async (record) => {
+      const employeeId = record["社員No"].value;
+      batchData = batchDatas.records?.filter(
+        (rec) => rec["社員No"]?.value === employeeId
       );
-      const batchDatas = await relayCertification.RelayGetValueBatchData();
-      let batchData;
-      if (
-        ledgerNames[0] == "雇用契約書" ||
-        ledgerNames[0] == "労働条件通知書"
-      ) {
-        data.records.map(async (record) => {
-          const employeeId = record["$id"].value;
-          batchData = batchDatas.records?.filter(
-            (rec) => rec["$id"]?.value === employeeId
+      //雇用契約書の場合は複数ある場合に最新データを反映
+      if (ledgerNames[0] == "雇用契約書") {
+        if (batchData && Array.isArray(batchData) && batchData.length > 1) {
+          const validRecords = batchData.filter(
+            (record) => record[informArray[ledgerNames[0]].approvalDate]?.value
           );
-          makehtmlArray(batchData);
-        });
-      } else {
-        data.records.map(async (record) => {
-          const employeeId = record["社員No"].value;
-          batchData = batchDatas.records?.filter(
-            (rec) => rec["社員No"]?.value === employeeId
-          );
-          makehtmlArray(batchData);
-        });
+          if (validRecords.length > 0) {
+            const latestDate = validRecords.reduce((latest, record) => {
+              const currentDate = new Date(
+                record[informArray[ledgerNames[0]].approvalDate].value
+              );
+              return currentDate > latest ? currentDate : latest;
+            }, new Date(0));
+
+            const latestRecords = validRecords.filter(
+              (record) =>
+                new Date(
+                  record[informArray[ledgerNames[0]].approvalDate].value
+                ).getTime() === latestDate.getTime()
+            );
+            batchData = latestRecords;
+          }
+        }
       }
-    } catch (e) {
-      displayHtml_join = "";
-    }
+      makehtmlArray(batchData);
+    });
     function makehtmlArray(batchData) {
       if (
         batchData[0] &&
-        (ledgerNames[0] == "雇用契約書" ||
-          ledgerNames[0] == "労働条件通知書" ||
-          batchData[0][informArray[ledgerNames[0]].approvalDate]?.value)
+        batchData[0][informArray[ledgerNames[0]].approvalDate]?.value
       ) {
         const displayValue = batchData[0];
         replace.replaceGetValue(ledgerNames[0], displayValue);
@@ -965,7 +832,7 @@ class Relay {
         if (this.data.length !== 0) {
           sessionStorage.setItem("getValue1", JSON.stringify(this.data));
         }
-        console.log(this.data); // レスポンスデータを処理
+        // console.log(this.data); // レスポンスデータを処理
       } catch (error) {
         console.error("Error:", error); // エラーハンドリング
       }

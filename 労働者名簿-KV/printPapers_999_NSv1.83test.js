@@ -1,3 +1,13 @@
+const appId_paper = {
+  雇用契約書: 3565,
+  労働条件通知書: 3565,
+  辞令: 3218,
+  在職証明書: 3218,
+  退職証明書: 3218,
+  解雇理由証明書: 3218,
+  労働者名簿: 3218,
+};
+
 (function () {
   "use strict";
 
@@ -9,16 +19,7 @@
   if (companyId === "") companyId = 327;
   const batch_params = Params.get("batch") || "";
   const userName = decodeURIComponent(Params.get("name")) || "";
-  const userMailAddress =
-    decodeURIComponent(Params.get("originalMailAddress")) || "";
-  const appId_paper = {
-    雇用契約書: 3565,
-    労働条件通知書: 3565,
-    辞令: null,
-    在職証明書: null,
-    退職証明書: null,
-    解雇理由証明書: null,
-  };
+  const userMailAddress = decodeURIComponent(Params.get("mailAddress")) || "";
 
   let title = document.getElementsByTagName("h1")[0].textContent;
   title = title.replaceAll("・", "");
@@ -40,25 +41,40 @@
     removeWatermarkInNewTab();
     if (title == "労働者名簿") {
       // 20250408 hidden kv-record-menu
-      document.getElementById("__next").style.visibility = "hidden";
+      // document.getElementById("__next").style.visibility = "hidden";
       // 一括印刷
       if (batch_params) {
         try {
+          document.querySelector(".kv-list").style.display = "none";
           showSpinner();
 
           if (replace.replaceGetStatus() === 1) {
-            await batchPrinting(companyId, replace, ledgerNames, batch_params); // awaitを追加
+            await batchPrinting(
+              companyId,
+              replace,
+              ledgerNames,
+              userName,
+              userMailAddress,
+              batch_params,
+            ); // awaitを追加
           } else {
             await replace.replaceInitProcess(ledgerNames);
-            await batchPrinting(companyId, replace, ledgerNames, batch_params); // awaitを追加
+            await batchPrinting(
+              companyId,
+              replace,
+              ledgerNames,
+              userName,
+              userMailAddress,
+              batch_params,
+            ); // awaitを追加
           }
-
           // 非同期処理が完了した後に遷移
-          window.location.href = `https://5ea2a167.viewer.kintoneapp.com/public/nkrfsv2-8-newkv-for-workerlist-3202?companyId=${companyId}`;
+          // window.close();
         } catch (error) {
           console.error("Error during batch processing:", error);
         } finally {
           hideSpinner(); // 処理が終わったらスピナーを隠す
+          window.location.href = `https://5ea2a167.viewer.kintoneapp.com/public/nkrfsv2-8-newkv-for-workerlist-3202-test?companyId=${companyId}&mailAddress=${userMailAddress}&name=${userName}`;
         }
 
         return state;
@@ -131,7 +147,7 @@
     }
     if (replace.replaceGetStatus() != 1) {
       alert(
-        "帳票フィールド管理データが取得できません。\n時間をおいて再試行してください"
+        "帳票フィールド管理データが取得できません。\n時間をおいて再試行してください",
       );
       //         window.close();
       hideSpinner(); // スピナー非表示
@@ -151,7 +167,7 @@
     document.getElementsByClassName("flex grow")[0].remove();
     document
       .getElementsByClassName(
-        "flex h-screen flex-col overflow-y-auto kv-container"
+        "flex h-screen flex-col overflow-y-auto kv-container",
       )[0]
       .append(newDiv);
 
@@ -204,11 +220,11 @@
         pElem[i].style.display = "none";
       }
       const aTag = document.createElement("a");
-      aTag.href = `https://5ea2a167.viewer.kintoneapp.com/public/nkrfsv2-8-newkv-for-workerlist-3202?companyId=${companyId}&name=${userName}`;
+      aTag.href = `https://5ea2a167.viewer.kintoneapp.com/public/nkrfsv2-8-newkv-for-workerlist-3202-test?companyId=${companyId}&name=${userName}&mailAddress=${userMailAddress}`;
       aTag.textContent = "労働者名簿作成社員選択";
       aTag.setAttribute(
         "class",
-        "text-role-action text-xs font-bold hover:underline"
+        "text-role-action text-xs font-bold hover:underline",
       );
       breadcrumbs.prepend(aTag);
     }
@@ -216,16 +232,9 @@
     const aButton1 = make_iconButton(
       "printer",
       ledgerNames[0],
-      "nkrfs-action1"
+      "nkrfs-action1",
     );
     aButton1.addEventListener("click", function () {
-      registerButtonLoggerKintone(
-        appId_paper[ledgerNames[0]],
-        recordid,
-        userName,
-        userMailAddress
-      ).catch((err) => console.error(err));
-
       let newTab1 = window.open("", "帳票", "_blank");
       if (newTab1 === null) {
         alert("window open error");
@@ -264,7 +273,7 @@
       }
       //  if (!displayValue[field_content[ledgerNames[0]]].value)
       const chkDate = new Date(
-        displayValue[field_content[ledgerNames[0]]].value
+        displayValue[field_content[ledgerNames[0]]].value,
       );
       if (isNaN(chkDate.getDate())) {
         addWatermarkForPrintInNewTab(newTab1.document);
@@ -272,13 +281,21 @@
 
       newTab1.print();
       newTab1.close();
+
+      registerButtonLoggerKintone(
+        appId_paper[ledgerNames[0]],
+        recordid,
+        userName,
+        userMailAddress,
+        ledgerNames[0],
+      ).catch((err) => console.error(err));
     });
 
     if (ledgerNames[0] == "雇用契約書") {
       const bButton1 = make_iconButton(
         "printer",
         "労働条件通知書",
-        "nkrfs-action1"
+        "nkrfs-action1",
       );
       bButton1.addEventListener("click", function () {
         let newTab1 = window.open("", "帳票", "_blank");
@@ -290,7 +307,7 @@
         newTab1.document.getElementsByTagName("html")[0].innerHTML = inText;
         //    if (!displayValue[field_content["労働条件通知書"]].value) {
         const chkDate = new Date(
-          displayValue[field_content["労働条件通知書"]].value
+          displayValue[field_content["労働条件通知書"]].value,
         );
         if (isNaN(chkDate.getDate())) {
           addWatermarkForPrintInNewTab(newTab1.document);
@@ -305,10 +322,11 @@
     return state;
   });
 
+  let latestRecords = [];
   // *** kViewer event - view.index.show ***
-  kviewer.events.on("view.index.show", function (state) {
-    let displayValue = state.record.kintoneRecord;
-    console.log("displayValue:", displayValue);
+  kviewer.events.on("records.show", function (state) {
+    latestRecords = state.records;
+    console.log("latestRecords:", latestRecords);
     if (replace.replaceGetStatus() === 0) {
       replace.replaceInitProcess(ledgerNames);
     }
@@ -319,69 +337,100 @@
       const pButton1 = make_iconButton(
         "printer",
         "雇用契約書一括印刷",
-        "nkrfs-button1"
+        "nkrfs-button1",
       );
       pButton1.addEventListener("click", function () {
-        const filter = JSON.parse(sessionStorage.getItem("filters"));
-        if (replace.replaceGetStatus() === 1) {
-          alertMissingTemplates();
-          batchPrinting(
-            companyId,
-            replace,
-            [ledgerNames[0]],
-            batch_params,
-            filter
-          );
+        const isEnabled = isPaginationEnabled();
+        const filter = Array.from(
+          new Set(latestRecords.map((r) => r.kintoneRecord.$id.value)),
+        );
+        console.log("filter:", filter);
+        if (!isEnabled) {
+          if (replace.replaceGetStatus() === 1) {
+            alertMissingTemplates();
+            batchPrinting(
+              companyId,
+              replace,
+              [ledgerNames[0]],
+              userName,
+              userMailAddress,
+              batch_params,
+              filter,
+              latestRecords,
+            );
+          } else {
+            (async () => {
+              try {
+                await replace.replaceInitProcess(ledgerNames);
+                alertMissingTemplates();
+                batchPrinting(
+                  companyId,
+                  replace,
+                  [ledgerNames[0]],
+                  userName,
+                  userMailAddress,
+                  batch_params,
+                  filter,
+                  latestRecords,
+                );
+              } catch (error) {
+                console.error("replaceInitProcess failed:", error);
+              }
+            })();
+          }
         } else {
-          (async () => {
-            try {
-              await replace.replaceInitProcess(ledgerNames);
-              alertMissingTemplates();
-              batchPrinting(
-                companyId,
-                replace,
-                [ledgerNames[0]],
-                batch_params,
-                filter
-              );
-            } catch (error) {
-              console.error("replaceInitProcess failed:", error);
-            }
-          })();
+          alert(
+            "出力件数が一括印刷の限度を超えています\n出力件数が500件以下となるよう検索条件を設定してください",
+          );
         }
       });
       const pButton2 = make_iconButton(
         "printer",
         "労働条件通知書一括印刷",
-        "nkrfs-button1"
+        "nkrfs-button1",
       );
       pButton2.addEventListener("click", function () {
-        const filter = JSON.parse(sessionStorage.getItem("filters"));
-        if (replace.replaceGetStatus() === 1) {
-          alertMissingTemplates();
-          batchPrinting(
-            companyId,
-            replace,
-            [ledgerNames[1]],
-            batch_params,
-            filter
-          );
+        const isEnabled = isPaginationEnabled();
+        const filter = Array.from(
+          new Set(latestRecords.map((r) => r.kintoneRecord.$id.value)),
+        );
+        if (!isEnabled) {
+          if (replace.replaceGetStatus() === 1) {
+            alertMissingTemplates();
+            batchPrinting(
+              companyId,
+              replace,
+              [ledgerNames[1]],
+              userName,
+              userMailAddress,
+              batch_params,
+              filter,
+              latestRecords,
+            );
+          } else {
+            (async () => {
+              try {
+                await replace.replaceInitProcess(ledgerNames);
+                alertMissingTemplates();
+                batchPrinting(
+                  companyId,
+                  replace,
+                  [ledgerNames[1]],
+                  userName,
+                  userMailAddress,
+                  batch_params,
+                  filter,
+                  latestRecords,
+                );
+              } catch (error) {
+                console.error("replaceInitProcess failed:", error);
+              }
+            })();
+          }
         } else {
-          (async () => {
-            try {
-              await replace.replaceInitProcess(ledgerNames);
-              alertMissingTemplates();
-              batchPrinting(
-                companyId,
-                replace,
-                [ledgerNames[1]],
-                batch_params,
-                filter
-              );
-            } catch (error) {
-              console.error("replaceInitProcess failed:", error);
-            }
-          })();
+          alert(
+            "出力件数が一括印刷の限度を超えています\n出力件数が500件以下となるよう検索条件を設定してください",
+          );
         }
       });
     }
@@ -390,7 +439,7 @@
       const pButton3 = make_iconButton(
         "close",
         "ウィンドウを閉じる",
-        "nkrfs-button3"
+        "nkrfs-button3",
       );
       pButton3.addEventListener("click", function () {
         window.close();
@@ -485,19 +534,37 @@ async function batchPrinting(
   companyId,
   replace,
   ledgerNames,
+  userName,
+  userMailAddress,
   batch_params,
-  filter
+  filter,
+  latestRecords,
 ) {
   const batchprint = new batchPrint(companyId, batch_params);
   showSpinner(); // スピナー表示
+  const newTab3 = await openTabByUserAction();
+  if (!newTab3) {
+    hideSpinner();
+    return;
+  }
   try {
     // async関数としてラップ
     await batchprint
-      .executeFunction(replace, ledgerNames, filter)
-      .then((displayHtml) => {
+      .executeFunction(replace, ledgerNames, filter, latestRecords)
+      .then(async (result) => {
+        const { displayHtml, idsArray } = result;
+        // .then((displayHtml) => {
         if (!displayHtml || !displayHtml.documentElement) {
           throw new CustomError("NoDataError", "表示するデータがありません");
         }
+
+        await registerButtonLoggerKintone(
+          appId_paper[ledgerNames[0]],
+          idsArray, // ← 配列想定
+          userName,
+          userMailAddress,
+          ledgerNames[0],
+        ).catch((err) => console.error(err));
 
         const inText = displayHtml.documentElement.outerHTML;
 
@@ -505,30 +572,125 @@ async function batchPrinting(
         const pageBreakStyle = `
         <style>
           @media print {
-            body > * {
+            body > div {
               page-break-after: always; /* 各セクションの後に改ページ */
             }
-            body > *:last-child {
+            body > div:last-child {
               page-break-after: auto; /* 最後は改ページしない */
+            }
+
+            div:has(.draft-watermark) {
+              position: relative;
+              display: block;
+              white-space: nowrap;
+              width: 100%;
+            }
+        
+            .draft-watermark {
+              position: absolute;            /* 親要素からの相対位置 */
+              display: inline-block;         /* インラインブロック化 */
+              white-space: nowrap;           /* 折り返ししない */
+              font-size: 10em;
+              color: rgba(169, 169, 169, 0.2);         
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%) rotate(-45deg);
+              pointer-events: none;
+              user-select: none;
+              z-index: 9999;
+              width: 100%;
+              text-align: center;
             }
           }
         </style>
       `;
         hideSpinner();
 
-        let newTab1 = window.open("", "帳票", "_blank");
-        if (newTab1 === null) {
-          alert("window open error");
-          return;
-        }
+        /*    // ② HTML 書き込み（安全）
+        newTab3.document.open();
+        newTab3.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          ${pageBreakStyle}
+        </head>
+        <body>
+          ${inText}
+        </body>
+      </html>
+    `);
+        newTab3.document.close();
 
+    //    setTimeout(() => {
+    //      newTab3.focus();
+    //      newTab3.print();
+    //      newTab3.close();
+    //    }, 300);
+
+        // let newTab3 = window.open("", "帳票");
+
+        // if (newTab3 === null) {
+        //   // フォールバック用モーダル
+        //   const modal = document.createElement("div");
+        //   modal.innerHTML = `
+        //     <div style="
+        //       position:fixed;
+        //       inset:0;
+        //       background:rgba(0,0,0,0.45);
+        //       display:flex;
+        //       align-items:center;
+        //       justify-content:center;
+        //       z-index:99999;
+        //     ">
+        //       <div style="
+        //         background:#fff;
+        //         padding:24px 28px;
+        //         border-radius:12px;
+        //         min-width:320px;
+        //         box-shadow:0 10px 30px rgba(0,0,0,.25);
+        //       ">
+        //         <p style="margin:0 0 20px; font-size:14px;">
+        //           帳票を新しいタブで開きます。<br>
+        //           OKボタンを押してください。
+        //         </p>
+        //         <div style="text-align:right;">
+        //           <button id="openTabBtn" style="
+        //             background:#ff8c00;
+        //             color:#fff;
+        //             border:none;
+        //             padding:8px 18px;
+        //             border-radius:6px;
+        //             cursor:pointer;
+        //             font-weight:600;
+        //           ">
+        //             OK
+        //           </button>
+        //         </div>
+        //       </div>
+        //     </div>
+        //   `;
+        //   document.body.appendChild(modal);
+
+        //   document.getElementById("openTabBtn").onclick = () => {
+        //     newTab3 = window.open("", "帳票");
+        //     if (newTab3 === null) {
+        //       alert(
+        //         "新しいタブを開けませんでした。ポップアップ設定をご確認ください。"
+        //       );
+        //       return;
+        //     }
+        //     modal.remove();
+        //   };
+        // }
+    */
         // 新しいタブに HTML を書き込み
-        newTab1.document.getElementsByTagName("html")[0].innerHTML =
+        newTab3.document.getElementsByTagName("html")[0].innerHTML =
           pageBreakStyle + inText;
 
         // 印刷を開始
-        newTab1.print();
-        newTab1.close();
+        newTab3.print();
+        newTab3.close();
       })
       .catch((error) => {
         hideSpinner();
@@ -537,7 +699,7 @@ async function batchPrinting(
         } else {
           console.error("An unexpected error occurred:", error);
           alert(
-            "帳票作成に失敗しました。もう一度時間をおいてからお試しください。"
+            "帳票作成に失敗しました。もう一度時間をおいてからお試しください。",
           );
         }
       });
@@ -555,61 +717,85 @@ async function batchPrinting(
 //印刷ログ作成
 async function registerButtonLoggerKintone(
   appId,
-  recordid,
+  recordids, // ← 配列想定
   userName,
-  userMailAddress
+  userMailAddress,
+  ledger,
 ) {
-  if (appId) {
-    const tableRequestParam = {
-      id: appId,
-      query_params: [
-        {
-          key: "$id",
-          operator: "=",
-          value: recordid,
-        },
-      ],
-      fields: ["印刷指示テーブル"],
+  console.log(appId, recordids, userName, userMailAddress, ledger);
+  if (!appId || !recordids || recordids.length === 0) return;
+
+  const recordIdArray = Array.isArray(recordids) ? recordids : [recordids];
+  const isSingle = recordIdArray.length === 1;
+
+  const tableRequestParam = {
+    id: appId,
+    query_params: [
+      {
+        key: "$id",
+        operator: isSingle ? "=" : "in",
+        value: isSingle ? String(recordIdArray[0]) : recordIdArray.map(String),
+      },
+    ],
+    fields: ["印刷指示テーブル", "$id"],
+  };
+
+  const tableRecords = await get(tableRequestParam);
+
+  if (!tableRecords || tableRecords.records.length === 0) return;
+
+  const timestamp = new Date().toISOString();
+
+  // 更新用レコード配列
+  const record_list = tableRecords.records.map((rec) => {
+    // サブテーブルが無い / 空でも必ず配列にする
+    const subTable = rec["印刷指示テーブル"]?.value ?? [];
+
+    const logEntry = {
+      value: {
+        指示者: { value: userName },
+        指示者メアド: { value: userMailAddress },
+        印刷指示日時: { value: timestamp },
+        帳票: { value: ledger },
+      },
     };
-    let tableRecord = await get(tableRequestParam);
 
-    if (tableRecord && tableRecord["records"].length > 0) {
-      const timestamp = new Date().toISOString();
-      const logEntry = {
-        value: {
-          指示者: { value: userName },
-          指示者メアド: { value: userMailAddress },
-          印刷指示日時: { value: timestamp },
+    // 既存配列を破壊しない（kintone事故防止）
+    const newSubTableValue = [...subTable, logEntry];
+
+    return {
+      id: rec.$id?.value, // ← $id が fields に含まれている前提
+      record: {
+        印刷指示テーブル: {
+          type: "SUBTABLE",
+          value: newSubTableValue,
         },
-      };
-      tableRecord["records"][0]["印刷指示テーブル"].value.push(logEntry);
+      },
+    };
+  });
 
-      console.log("Kintone送信用ログ:", tableRecord);
+  // $id が無いレコードを除外（安全策）
+  const safeRecordList = record_list.filter((r) => r.id);
 
-      try {
-        const requestTableParam = {
-          id: appId,
-          record_list: [
-            {
-              id: recordid,
-              record: tableRecord["records"][0],
-            },
-          ],
-        };
-        const response = await put(requestTableParam);
+  console.log("Kintone送信用ログ（一括）:", safeRecordList);
 
-        // console.log("Kintoneにログを保存しました");
-      } catch (err) {
-        console.error("Kintone送信エラー:", err);
-        // alert("ログの送信に失敗しました");
-      }
-    }
+  try {
+    const requestTableParam = {
+      id: appId,
+      record_list: safeRecordList,
+    };
+
+    const result = await put(requestTableParam);
+    return result;
+  } catch (e) {
+    console.error("印刷指示テーブル一括更新エラー", e);
   }
 }
 
 // レコードのputメソッドを定義
 async function put(requestParam) {
-  const endpoint = "https://kintone-relay-api-eidnwbgjma-an.a.run.app";
+  const endpoint =
+    "https://kintone-relay-api-light-538321378695.asia-northeast1.run.app";
   const response = await fetch(endpoint + "/putRecord", {
     method: "POST",
     headers: {
@@ -623,7 +809,8 @@ async function put(requestParam) {
 
 // レコードのGetメソッドを定義
 async function get(requestParam) {
-  const endpoint = "https://kintone-relay-api-eidnwbgjma-an.a.run.app";
+  const endpoint =
+    "https://kintone-relay-api-light-538321378695.asia-northeast1.run.app";
   const response = await fetch(endpoint + "/getRecord", {
     method: "POST",
     headers: {
@@ -642,8 +829,81 @@ function alertMissingTemplates() {
   if (missingNames.length > 0) {
     alert(
       `以下の帳票はテンプレート登録がないため、デフォルトのテンプレートを使用しています：\n\n- ${missingNames.join(
-        "\n- "
-      )}`
+        "\n- ",
+      )}`,
     );
   }
+}
+
+// ページネーションが有効かどうかを確認する関数
+function isPaginationEnabled() {
+  const flexDivs = document.querySelectorAll("div.flex");
+
+  for (const div of flexDivs) {
+    const buttons = div.querySelectorAll(":scope > button.border-role-action");
+
+    // paginationっぽい構造
+    if (buttons.length === 2) {
+      // どちらかが有効なら true
+      return [...buttons].some((btn) => !btn.disabled);
+    }
+  }
+  return false;
+}
+
+// ★ 必ず batchPrinting より前に置く
+function openTabByUserAction() {
+  return new Promise((resolve) => {
+    const modal = document.createElement("div");
+    modal.innerHTML = `
+      <div style="
+        position:fixed;
+        inset:0;
+        background:rgba(0,0,0,0.45);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        z-index:99999;
+      ">
+        <div style="
+          background:#fff;
+          padding:24px 28px;
+          border-radius:12px;
+          min-width:320px;
+          box-shadow:0 10px 30px rgba(0,0,0,.25);
+        ">
+          <p style="margin:0 0 20px; font-size:14px;">
+            帳票を新しいタブで開きます。<br>
+            OKボタンを押してください。
+          </p>
+          <div style="text-align:right;">
+            <button id="openTabBtn" style="
+              background:#ff8c00;
+              color:#fff;
+              border:none;
+              padding:8px 18px;
+              border-radius:6px;
+              cursor:pointer;
+              font-weight:600;
+            ">
+              OK
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    document.getElementById("openTabBtn").onclick = () => {
+      const tab = window.open("", "帳票");
+
+      if (!tab) {
+        alert("ポップアップがブロックされています");
+        return;
+      }
+
+      modal.remove();
+      resolve(tab);
+    };
+  });
 }

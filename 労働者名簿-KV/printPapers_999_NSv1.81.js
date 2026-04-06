@@ -14,10 +14,10 @@
   const appId_paper = {
     雇用契約書: 3565,
     労働条件通知書: 3565,
-    辞令: null,
-    在職証明書: null,
-    退職証明書: null,
-    解雇理由証明書: null,
+    辞令: 3218,
+    在職証明書: 3218,
+    退職証明書: 3218,
+    解雇理由証明書: 3218,
   };
 
   let title = document.getElementsByTagName("h1")[0].textContent;
@@ -131,7 +131,7 @@
     }
     if (replace.replaceGetStatus() != 1) {
       alert(
-        "帳票フィールド管理データが取得できません。\n時間をおいて再試行してください"
+        "帳票フィールド管理データが取得できません。\n時間をおいて再試行してください",
       );
       //         window.close();
       hideSpinner(); // スピナー非表示
@@ -151,7 +151,7 @@
     document.getElementsByClassName("flex grow")[0].remove();
     document
       .getElementsByClassName(
-        "flex h-screen flex-col overflow-y-auto kv-container"
+        "flex h-screen flex-col overflow-y-auto kv-container",
       )[0]
       .append(newDiv);
 
@@ -208,7 +208,7 @@
       aTag.textContent = "労働者名簿作成社員選択";
       aTag.setAttribute(
         "class",
-        "text-role-action text-xs font-bold hover:underline"
+        "text-role-action text-xs font-bold hover:underline",
       );
       breadcrumbs.prepend(aTag);
     }
@@ -216,16 +216,9 @@
     const aButton1 = make_iconButton(
       "printer",
       ledgerNames[0],
-      "nkrfs-action1"
+      "nkrfs-action1",
     );
     aButton1.addEventListener("click", function () {
-      registerButtonLoggerKintone(
-        appId_paper[ledgerNames[0]],
-        recordid,
-        userName,
-        userMailAddress
-      ).catch((err) => console.error(err));
-
       let newTab1 = window.open("", "帳票", "_blank");
       if (newTab1 === null) {
         alert("window open error");
@@ -264,7 +257,7 @@
       }
       //  if (!displayValue[field_content[ledgerNames[0]]].value)
       const chkDate = new Date(
-        displayValue[field_content[ledgerNames[0]]].value
+        displayValue[field_content[ledgerNames[0]]].value,
       );
       if (isNaN(chkDate.getDate())) {
         addWatermarkForPrintInNewTab(newTab1.document);
@@ -272,13 +265,21 @@
 
       newTab1.print();
       newTab1.close();
+
+      registerButtonLoggerKintone(
+        appId_paper[ledgerNames[0]],
+        recordid,
+        userName,
+        userMailAddress,
+        ledgerNames[0],
+      ).catch((err) => console.error(err));
     });
 
     if (ledgerNames[0] == "雇用契約書") {
       const bButton1 = make_iconButton(
         "printer",
         "労働条件通知書",
-        "nkrfs-action1"
+        "nkrfs-action1",
       );
       bButton1.addEventListener("click", function () {
         let newTab1 = window.open("", "帳票", "_blank");
@@ -290,7 +291,7 @@
         newTab1.document.getElementsByTagName("html")[0].innerHTML = inText;
         //    if (!displayValue[field_content["労働条件通知書"]].value) {
         const chkDate = new Date(
-          displayValue[field_content["労働条件通知書"]].value
+          displayValue[field_content["労働条件通知書"]].value,
         );
         if (isNaN(chkDate.getDate())) {
           addWatermarkForPrintInNewTab(newTab1.document);
@@ -305,10 +306,11 @@
     return state;
   });
 
+  let latestRecords = [];
   // *** kViewer event - view.index.show ***
-  kviewer.events.on("view.index.show", function (state) {
-    let displayValue = state.record.kintoneRecord;
-    console.log("displayValue:", displayValue);
+  kviewer.events.on("records.show", function (state) {
+    latestRecords = state.records;
+    console.log("latestRecords:", latestRecords);
     if (replace.replaceGetStatus() === 0) {
       replace.replaceInitProcess(ledgerNames);
     }
@@ -319,69 +321,91 @@
       const pButton1 = make_iconButton(
         "printer",
         "雇用契約書一括印刷",
-        "nkrfs-button1"
+        "nkrfs-button1",
       );
       pButton1.addEventListener("click", function () {
-        const filter = JSON.parse(sessionStorage.getItem("filters"));
-        if (replace.replaceGetStatus() === 1) {
-          alertMissingTemplates();
-          batchPrinting(
-            companyId,
-            replace,
-            [ledgerNames[0]],
-            batch_params,
-            filter
-          );
+        const isEnabled = isPaginationEnabled();
+        const filter = Array.from(
+          new Set(latestRecords.map((r) => r.kintoneRecord.$id.value)),
+        );
+        if (!isEnabled) {
+          if (replace.replaceGetStatus() === 1) {
+            alertMissingTemplates();
+            batchPrinting(
+              companyId,
+              replace,
+              [ledgerNames[0]],
+              batch_params,
+              filter,
+              latestRecords,
+            );
+          } else {
+            (async () => {
+              try {
+                await replace.replaceInitProcess(ledgerNames);
+                alertMissingTemplates();
+                batchPrinting(
+                  companyId,
+                  replace,
+                  [ledgerNames[0]],
+                  batch_params,
+                  filter,
+                  latestRecords,
+                );
+              } catch (error) {
+                console.error("replaceInitProcess failed:", error);
+              }
+            })();
+          }
         } else {
-          (async () => {
-            try {
-              await replace.replaceInitProcess(ledgerNames);
-              alertMissingTemplates();
-              batchPrinting(
-                companyId,
-                replace,
-                [ledgerNames[0]],
-                batch_params,
-                filter
-              );
-            } catch (error) {
-              console.error("replaceInitProcess failed:", error);
-            }
-          })();
+          alert(
+            "出力件数が一括印刷の限度を超えています\n出力件数が500件以下となるよう検索条件を設定してください",
+          );
         }
       });
       const pButton2 = make_iconButton(
         "printer",
         "労働条件通知書一括印刷",
-        "nkrfs-button1"
+        "nkrfs-button1",
       );
       pButton2.addEventListener("click", function () {
-        const filter = JSON.parse(sessionStorage.getItem("filters"));
-        if (replace.replaceGetStatus() === 1) {
-          alertMissingTemplates();
-          batchPrinting(
-            companyId,
-            replace,
-            [ledgerNames[1]],
-            batch_params,
-            filter
-          );
+        const isEnabled = isPaginationEnabled();
+        const filter = Array.from(
+          new Set(latestRecords.map((r) => r.kintoneRecord.$id.value)),
+        );
+        if (!isEnabled) {
+          if (replace.replaceGetStatus() === 1) {
+            alertMissingTemplates();
+            batchPrinting(
+              companyId,
+              replace,
+              [ledgerNames[1]],
+              batch_params,
+              filter,
+              latestRecords,
+            );
+          } else {
+            (async () => {
+              try {
+                await replace.replaceInitProcess(ledgerNames);
+                alertMissingTemplates();
+                batchPrinting(
+                  companyId,
+                  replace,
+                  [ledgerNames[1]],
+                  batch_params,
+                  filter,
+                  latestRecords,
+                );
+              } catch (error) {
+                console.error("replaceInitProcess failed:", error);
+              }
+            })();
+          }
         } else {
-          (async () => {
-            try {
-              await replace.replaceInitProcess(ledgerNames);
-              alertMissingTemplates();
-              batchPrinting(
-                companyId,
-                replace,
-                [ledgerNames[1]],
-                batch_params,
-                filter
-              );
-            } catch (error) {
-              console.error("replaceInitProcess failed:", error);
-            }
-          })();
+          alert(
+            "出力件数が一括印刷の限度を超えています\n出力件数が500件以下となるよう検索条件を設定してください",
+          );
         }
       });
     }
@@ -390,7 +414,7 @@
       const pButton3 = make_iconButton(
         "close",
         "ウィンドウを閉じる",
-        "nkrfs-button3"
+        "nkrfs-button3",
       );
       pButton3.addEventListener("click", function () {
         window.close();
@@ -486,14 +510,15 @@ async function batchPrinting(
   replace,
   ledgerNames,
   batch_params,
-  filter
+  filter,
+  latestRecords,
 ) {
   const batchprint = new batchPrint(companyId, batch_params);
   showSpinner(); // スピナー表示
   try {
     // async関数としてラップ
     await batchprint
-      .executeFunction(replace, ledgerNames, filter)
+      .executeFunction(replace, ledgerNames, filter, latestRecords)
       .then((displayHtml) => {
         if (!displayHtml || !displayHtml.documentElement) {
           throw new CustomError("NoDataError", "表示するデータがありません");
@@ -505,15 +530,40 @@ async function batchPrinting(
         const pageBreakStyle = `
         <style>
           @media print {
-            body > * {
+            body > div {
               page-break-after: always; /* 各セクションの後に改ページ */
             }
-            body > *:last-child {
+            body > div:last-child {
               page-break-after: auto; /* 最後は改ページしない */
+            }
+
+            div:has(.draft-watermark) {
+              position: relative;
+              display: block;
+              white-space: nowrap;
+              width: 100%;
+            }
+        
+            .draft-watermark {
+              position: absolute;            /* 親要素からの相対位置 */
+              display: inline-block;         /* インラインブロック化 */
+              white-space: nowrap;           /* 折り返ししない */
+              font-size: 10em;
+              color: rgba(169, 169, 169, 0.2);         
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%) rotate(-45deg);
+              pointer-events: none;
+              user-select: none;
+              z-index: 9999;
+              width: 100%;
+              text-align: center;
+              page-break-before: always;
             }
           }
         </style>
       `;
+
         hideSpinner();
 
         let newTab1 = window.open("", "帳票", "_blank");
@@ -537,7 +587,7 @@ async function batchPrinting(
         } else {
           console.error("An unexpected error occurred:", error);
           alert(
-            "帳票作成に失敗しました。もう一度時間をおいてからお試しください。"
+            "帳票作成に失敗しました。もう一度時間をおいてからお試しください。",
           );
         }
       });
@@ -557,7 +607,8 @@ async function registerButtonLoggerKintone(
   appId,
   recordid,
   userName,
-  userMailAddress
+  userMailAddress,
+  ledger,
 ) {
   if (appId) {
     const tableRequestParam = {
@@ -580,6 +631,7 @@ async function registerButtonLoggerKintone(
           指示者: { value: userName },
           指示者メアド: { value: userMailAddress },
           印刷指示日時: { value: timestamp },
+          帳票: { value: ledger },
         },
       };
       tableRecord["records"][0]["印刷指示テーブル"].value.push(logEntry);
@@ -609,7 +661,8 @@ async function registerButtonLoggerKintone(
 
 // レコードのputメソッドを定義
 async function put(requestParam) {
-  const endpoint = "https://kintone-relay-api-eidnwbgjma-an.a.run.app";
+  const endpoint =
+    "https://kintone-relay-api-light-538321378695.asia-northeast1.run.app/";
   const response = await fetch(endpoint + "/putRecord", {
     method: "POST",
     headers: {
@@ -623,7 +676,8 @@ async function put(requestParam) {
 
 // レコードのGetメソッドを定義
 async function get(requestParam) {
-  const endpoint = "https://kintone-relay-api-eidnwbgjma-an.a.run.app";
+  const endpoint =
+    "https://kintone-relay-api-light-538321378695.asia-northeast1.run.app/";
   const response = await fetch(endpoint + "/getRecord", {
     method: "POST",
     headers: {
@@ -642,8 +696,24 @@ function alertMissingTemplates() {
   if (missingNames.length > 0) {
     alert(
       `以下の帳票はテンプレート登録がないため、デフォルトのテンプレートを使用しています：\n\n- ${missingNames.join(
-        "\n- "
-      )}`
+        "\n- ",
+      )}`,
     );
   }
+}
+
+// ページネーションが有効かどうかを確認する関数
+function isPaginationEnabled() {
+  const flexDivs = document.querySelectorAll("div.flex");
+
+  for (const div of flexDivs) {
+    const buttons = div.querySelectorAll(":scope > button.border-role-action");
+
+    // paginationっぽい構造
+    if (buttons.length === 2) {
+      // どちらかが有効なら true
+      return [...buttons].some((btn) => !btn.disabled);
+    }
+  }
+  return false;
 }

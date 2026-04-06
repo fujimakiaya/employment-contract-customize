@@ -389,6 +389,8 @@ class ReplaceValue {
   async replaceInitProcess(ledgerNames) {
     await this.allowanceTable();
     //*** Initialization of printprocess - get 帳票フィールド管理アプリ・データ ***
+    const fieldTable = structuredClone(ledgerNames);
+    if (fieldTable.length < 2) fieldTable.push(" "); //push dummy data
     const relay = new Relay(
       3851,
       [
@@ -400,7 +402,7 @@ class ReplaceValue {
         {
           key: "帳票名",
           operator: "in",
-          value: ledgerNames,
+          value: fieldTable,
         },
       ],
       ["帳票名", "フィールド管理", "日付の表示方法", "htmファイル"]

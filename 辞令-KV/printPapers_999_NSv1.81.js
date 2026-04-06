@@ -14,10 +14,10 @@
   const appId_paper = {
     雇用契約書: 3565,
     労働条件通知書: 3565,
-    辞令: null,
-    在職証明書: null,
-    退職証明書: null,
-    解雇理由証明書: null,
+    辞令: 3218,
+    在職証明書: 3218,
+    退職証明書: 3218,
+    解雇理由証明書: 3218,
   };
 
   let title = document.getElementsByTagName("h1")[0].textContent;
@@ -219,13 +219,6 @@
       "nkrfs-action1"
     );
     aButton1.addEventListener("click", function () {
-      registerButtonLoggerKintone(
-        appId_paper[ledgerNames[0]],
-        recordid,
-        userName,
-        userMailAddress
-      ).catch((err) => console.error(err));
-
       let newTab1 = window.open("", "帳票", "_blank");
       if (newTab1 === null) {
         alert("window open error");
@@ -272,6 +265,14 @@
 
       newTab1.print();
       newTab1.close();
+
+      registerButtonLoggerKintone(
+        appId_paper[ledgerNames[0]],
+        recordid,
+        userName,
+        userMailAddress,
+        ledgerNames[0]
+      ).catch((err) => console.error(err));
     });
 
     if (ledgerNames[0] == "雇用契約書") {
@@ -307,8 +308,6 @@
 
   // *** kViewer event - view.index.show ***
   kviewer.events.on("view.index.show", function (state) {
-    let displayValue = state.record.kintoneRecord;
-    console.log("displayValue:", displayValue);
     if (replace.replaceGetStatus() === 0) {
       replace.replaceInitProcess(ledgerNames);
     }
@@ -557,7 +556,8 @@ async function registerButtonLoggerKintone(
   appId,
   recordid,
   userName,
-  userMailAddress
+  userMailAddress,
+  ledger
 ) {
   if (appId) {
     const tableRequestParam = {
@@ -580,6 +580,7 @@ async function registerButtonLoggerKintone(
           指示者: { value: userName },
           指示者メアド: { value: userMailAddress },
           印刷指示日時: { value: timestamp },
+          帳票: { value: ledger },
         },
       };
       tableRecord["records"][0]["印刷指示テーブル"].value.push(logEntry);
