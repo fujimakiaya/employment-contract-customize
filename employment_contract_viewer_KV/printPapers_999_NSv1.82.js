@@ -47,6 +47,7 @@
       // 一括印刷
       if (batch_params) {
         try {
+          document.querySelector(".kv-list").style.display = "none";
           showSpinner();
 
           if (replace.replaceGetStatus() === 1) {
@@ -537,6 +538,15 @@ async function batchPrinting(
 
   const batchprint = new batchPrint(companyId, batch_params);
   showSpinner(); // スピナー表示
+  // 労働者名簿の場合、印刷前に新しいタブを開いておく（ポップアップブロック対策）
+  let newTab = null;
+  if (ledgerNames[0] == "労働者名簿") {
+    newTab = await openTabByUserAction();
+    if (!newTab) {
+      hideSpinner();
+      return;
+    }
+  }
   try {
     const displayHtml = await batchprint.executeFunction(
       replace,
@@ -549,9 +559,11 @@ async function batchPrinting(
       throw new CustomError("NoDataError", "表示するデータがありません");
     }
 
-    const newTab = window.open("", "帳票", "_blank");
     if (!newTab) {
-      throw new Error("window open error");
+      newTab = window.open("", "帳票", "_blank");
+      if (!newTab) {
+        throw new Error("window open error");
+      }
     }
 
     const doc = newTab.document;
@@ -878,4 +890,61 @@ function updatePaginationCount(count) {
 
   countTexts[0].textContent = `1-${count}件`;
   countTexts[1].textContent = `全${count}件`;
+}
+
+// ユーザーアクションでタブを開く関数
+function openTabByUserAction() {
+  return new Promise((resolve) => {
+    const modal = document.createElement("div");
+    modal.innerHTML = `
+      <div style="
+        position:fixed;
+        inset:0;
+        background:rgba(0,0,0,0.45);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        z-index:99999;
+      ">
+        <div style="
+          background:#fff;
+          padding:24px 28px;
+          border-radius:12px;
+          min-width:320px;
+          box-shadow:0 10px 30px rgba(0,0,0,.25);
+        ">
+          <p style="margin:0 0 20px; font-size:14px;">
+            帳票を新しいタブで開きます。<br>
+            OKボタンを押してください。
+          </p>
+          <div style="text-align:right;">
+            <button id="openTabBtn" style="
+              background:#ff8c00;
+              color:#fff;
+              border:none;
+              padding:8px 18px;
+              border-radius:6px;
+              cursor:pointer;
+              font-weight:600;
+            ">
+              OK
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    document.getElementById("openTabBtn").onclick = () => {
+      const tab = window.open("", "帳票");
+
+      if (!tab) {
+        alert("ポップアップがブロックされています");
+        return;
+      }
+
+      modal.remove();
+      resolve(tab);
+    };
+  });
 }
