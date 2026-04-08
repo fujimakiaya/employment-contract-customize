@@ -527,6 +527,9 @@ class batchPrint {
             ).values(),
           ),
         };
+        idRecords = data.records
+          .map((item) => item["$id"]?.value)
+          .filter(Boolean);
         employeeIds = [
           ...new Set(
             data.records.map((item) => item["$id"]?.value).filter(Boolean),
@@ -847,7 +850,7 @@ class batchPrint {
   }
 }
 
-const ENDPOINT =
+const endpoint_2 =
   "https://kintone-relay-api-light-538321378695.asia-northeast1.run.app";
 
 //リレーAPIで情報取得 replace_dataを返す
@@ -867,7 +870,7 @@ class Relay {
     };
 
     try {
-      const response = await fetch(ENDPOINT + "/getRecord", {
+      const response = await fetch(endpoint_2 + "/getRecord", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -896,7 +899,7 @@ class Relay {
     };
 
     try {
-      const response = await fetch(ENDPOINT + "/getRecord", {
+      const response = await fetch(endpoint_2 + "/getRecord", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -925,7 +928,7 @@ class Relay {
     };
 
     try {
-      const response = await fetch(ENDPOINT + "/getRecord", {
+      const response = await fetch(endpoint_2 + "/getRecord", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -957,7 +960,7 @@ class Relay {
       };
 
       try {
-        const response = await fetch(ENDPOINT + "/getRecord", {
+        const response = await fetch(endpoint_2 + "/getRecord", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -997,7 +1000,7 @@ class Relay {
         };
 
         try {
-          const response = await fetch(ENDPOINT + "/getFile", {
+          const response = await fetch(endpoint_2 + "/getFile", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",

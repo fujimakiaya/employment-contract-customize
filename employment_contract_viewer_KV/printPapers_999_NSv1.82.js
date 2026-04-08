@@ -1,3 +1,13 @@
+const appId_paper = {
+  雇用契約書: 3565,
+  労働条件通知書: 3565,
+  辞令: 3218,
+  在職証明書: 3218,
+  退職証明書: 3218,
+  解雇理由証明書: 3218,
+  労働者名簿: 3218,
+};
+
 (function () {
   "use strict";
 
@@ -11,16 +21,7 @@
   }
   const batch_params = Params.get("batch") || "";
   const userName = decodeURIComponent(Params.get("name")) || "";
-  const userMailAddress =
-    decodeURIComponent(Params.get("originalMailAddress")) || "";
-  const appId_paper = {
-    雇用契約書: 3565,
-    労働条件通知書: 3565,
-    辞令: 3218,
-    在職証明書: 3218,
-    退職証明書: 3218,
-    解雇理由証明書: 3218,
-  };
+  const userMailAddress = decodeURIComponent(Params.get("mailAddress")) || "";
 
   let title = document.getElementsByTagName("h1")[0].textContent;
   title = title.replaceAll("・", "");
@@ -51,18 +52,32 @@
           showSpinner();
 
           if (replace.replaceGetStatus() === 1) {
-            await batchPrinting(companyId, replace, ledgerNames, batch_params); // awaitを追加
+            await batchPrinting(
+              companyId,
+              replace,
+              ledgerNames,
+              userName,
+              userMailAddress,
+              batch_params,
+            ); // awaitを追加
           } else {
             await replace.replaceInitProcess(ledgerNames);
-            await batchPrinting(companyId, replace, ledgerNames, batch_params); // awaitを追加
+            await batchPrinting(
+              companyId,
+              replace,
+              ledgerNames,
+              userName,
+              userMailAddress,
+              batch_params,
+            ); // awaitを追加
           }
 
           // 非同期処理が完了した後に遷移
-          window.location.href = `https://5ea2a167.viewer.kintoneapp.com/public/nkrfsv2-8-newkv-for-workerlist-3202?companyId=${companyId}`;
         } catch (error) {
           console.error("Error during batch processing:", error);
         } finally {
           hideSpinner(); // 処理が終わったらスピナーを隠す
+          window.location.href = `https://5ea2a167.viewer.kintoneapp.com/public/nkrfsv2-8-newkv-for-workerlist-3202?companyId=${companyId}&mailAddress=${userMailAddress}&name=${userName}`;
         }
 
         return state;
@@ -209,7 +224,7 @@
         pElem[i].style.display = "none";
       }
       const aTag = document.createElement("a");
-      aTag.href = `https://5ea2a167.viewer.kintoneapp.com/public/nkrfsv2-8-newkv-for-workerlist-3202?companyId=${companyId}&name=${userName}`;
+      aTag.href = `https://5ea2a167.viewer.kintoneapp.com/public/nkrfsv2-8-newkv-for-workerlist-3202?companyId=${companyId}&name=${userName}&mailAddress=${userMailAddress}`;
       aTag.textContent = "労働者名簿作成社員選択";
       aTag.setAttribute(
         "class",
@@ -352,6 +367,8 @@
               companyId,
               replace,
               [ledgerNames[0]],
+              userName,
+              userMailAddress,
               batch_params,
               filter,
               filteredLatestRecords,
@@ -365,6 +382,8 @@
                   companyId,
                   replace,
                   [ledgerNames[0]],
+                  userName,
+                  userMailAddress,
                   batch_params,
                   filter,
                   filteredLatestRecords,
@@ -397,6 +416,8 @@
               companyId,
               replace,
               [ledgerNames[1]],
+              userName,
+              userMailAddress,
               batch_params,
               filter,
               filteredLatestRecords,
@@ -410,6 +431,8 @@
                   companyId,
                   replace,
                   [ledgerNames[1]],
+                  userName,
+                  userMailAddress,
                   batch_params,
                   filter,
                   filteredLatestRecords,
@@ -437,7 +460,6 @@
         window.close();
       });
     }
-
     return state;
   });
 })();
@@ -527,6 +549,8 @@ async function batchPrinting(
   companyId,
   replace,
   ledgerNames,
+  userName,
+  userMailAddress,
   batch_params,
   filter,
   latestRecords,
@@ -548,7 +572,7 @@ async function batchPrinting(
     }
   }
   try {
-    const displayHtml = await batchprint.executeFunction(
+    const { displayHtml, idsArray } = await batchprint.executeFunction(
       replace,
       ledgerNames,
       filter,
@@ -589,6 +613,14 @@ async function batchPrinting(
     // ===== bodyにHTMLを流し込む =====
     doc.body.innerHTML = displayHtml.documentElement.outerHTML;
 
+    await registerButtonLoggerKintone(
+      appId_paper[ledgerNames[0]],
+      idsArray, // ← 配列想定
+      userName,
+      userMailAddress,
+      ledgerNames[0],
+    ).catch((err) => console.error(err));
+
     hideSpinner();
 
     newTab.print();
@@ -612,57 +644,78 @@ async function batchPrinting(
 //印刷ログ作成
 async function registerButtonLoggerKintone(
   appId,
-  recordid,
+  recordids, // ← 配列想定
   userName,
   userMailAddress,
   ledger,
 ) {
-  if (appId) {
-    const tableRequestParam = {
-      id: appId,
-      query_params: [
-        {
-          key: "$id",
-          operator: "=",
-          value: recordid,
-        },
-      ],
-      fields: ["印刷指示テーブル"],
+  console.log(appId, recordids, userName, userMailAddress, ledger);
+  if (!appId || !recordids || recordids.length === 0) return;
+
+  const recordIdArray = Array.isArray(recordids) ? recordids : [recordids];
+  const isSingle = recordIdArray.length === 1;
+
+  const tableRequestParam = {
+    id: appId,
+    query_params: [
+      {
+        key: "$id",
+        operator: isSingle ? "=" : "in",
+        value: isSingle ? String(recordIdArray[0]) : recordIdArray.map(String),
+      },
+    ],
+    fields: ["印刷指示テーブル", "$id"],
+  };
+
+  const tableRecords = await get(tableRequestParam);
+
+  if (!tableRecords || tableRecords.records.length === 0) return;
+
+  const timestamp = new Date().toISOString();
+
+  // 更新用レコード配列
+  const record_list = tableRecords.records.map((rec) => {
+    // サブテーブルが無い / 空でも必ず配列にする
+    const subTable = rec["印刷指示テーブル"]?.value ?? [];
+
+    const logEntry = {
+      value: {
+        指示者: { value: userName },
+        指示者メアド: { value: userMailAddress },
+        印刷指示日時: { value: timestamp },
+        帳票: { value: ledger },
+      },
     };
-    let tableRecord = await get(tableRequestParam);
 
-    if (tableRecord && tableRecord["records"].length > 0) {
-      const timestamp = new Date().toISOString();
-      const logEntry = {
-        value: {
-          指示者: { value: userName },
-          指示者メアド: { value: userMailAddress },
-          印刷指示日時: { value: timestamp },
-          帳票: { value: ledger },
+    // 既存配列を破壊しない（kintone事故防止）
+    const newSubTableValue = [...subTable, logEntry];
+
+    return {
+      id: rec.$id?.value, // ← $id が fields に含まれている前提
+      record: {
+        印刷指示テーブル: {
+          type: "SUBTABLE",
+          value: newSubTableValue,
         },
-      };
-      tableRecord["records"][0]["印刷指示テーブル"].value.push(logEntry);
+      },
+    };
+  });
 
-      console.log("Kintone送信用ログ:", tableRecord);
+  // $id が無いレコードを除外（安全策）
+  const safeRecordList = record_list.filter((r) => r.id);
 
-      try {
-        const requestTableParam = {
-          id: appId,
-          record_list: [
-            {
-              id: recordid,
-              record: tableRecord["records"][0],
-            },
-          ],
-        };
-        const response = await put(requestTableParam);
+  console.log("Kintone送信用ログ（一括）:", safeRecordList);
 
-        // console.log("Kintoneにログを保存しました");
-      } catch (err) {
-        console.error("Kintone送信エラー:", err);
-        // alert("ログの送信に失敗しました");
-      }
-    }
+  try {
+    const requestTableParam = {
+      id: appId,
+      record_list: safeRecordList,
+    };
+
+    const result = await put(requestTableParam);
+    return result;
+  } catch (e) {
+    console.error("印刷指示テーブル一括更新エラー", e);
   }
 }
 
