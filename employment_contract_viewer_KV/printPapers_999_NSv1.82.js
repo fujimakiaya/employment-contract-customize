@@ -609,63 +609,61 @@ async function batchPrinting(
   const batchprint = new batchPrint(companyId, batch_params);
   showSpinner(); // スピナー表示
   try {
-    // async関数としてラップ
-    await batchprint
-      .executeFunction(replace, ledgerNames, filter, latestRecords)
-      .then((displayHtml) => {
-        if (!displayHtml || !displayHtml.documentElement) {
-          throw new CustomError("NoDataError", "表示するデータがありません");
-        }
+    const displayHtml = await batchprint.executeFunction(
+      replace,
+      ledgerNames,
+      filter,
+      latestRecords,
+    );
 
-        const inText = displayHtml.documentElement.outerHTML;
+    if (!displayHtml?.documentElement) {
+      throw new CustomError("NoDataError", "表示するデータがありません");
+    }
 
-        // 改ページ用のスタイルを定義
-        const pageBreakStyle = `
-        <style>
-          @media print {
-            body > * {
-              page-break-after: always; /* 各セクションの後に改ページ */
-            }
-            body > *:last-child {
-              page-break-after: auto; /* 最後は改ページしない */
-            }
-          }
-        </style>
-      `;
-        hideSpinner();
+    const newTab = window.open("", "帳票", "_blank");
+    if (!newTab) {
+      throw new Error("window open error");
+    }
 
-        let newTab1 = window.open("", "帳票", "_blank");
-        if (newTab1 === null) {
-          alert("window open error");
-          return;
-        }
+    const doc = newTab.document;
 
-        // 新しいタブに HTML を書き込み
-        newTab1.document.getElementsByTagName("html")[0].innerHTML =
-          pageBreakStyle + inText;
+    // 初期化（念のため）
+    doc.open();
+    doc.close();
 
-        // 印刷を開始
-        newTab1.print();
-        newTab1.close();
-      })
-      .catch((error) => {
-        hideSpinner();
-        if (error instanceof CustomError && error.name === "NoDataError") {
-          alert(error.message); // "表示するデータがありません"を表示
-        } else {
-          console.error("An unexpected error occurred:", error);
-          alert(
-            "帳票作成に失敗しました。もう一度時間をおいてからお試しください。",
-          );
-        }
-      });
+    // ===== style追加 =====
+    const style = doc.createElement("style");
+    style.textContent = `
+    @media print {
+      body > * {
+        page-break-after: always;
+      }
+      body > *:last-child {
+        page-break-after: auto;
+      }
+    }
+  `;
+    doc.head.appendChild(style);
 
-    // 処理が完了した後に return
+    // ===== bodyにHTMLを流し込む =====
+    doc.body.innerHTML = displayHtml.documentElement.outerHTML;
+
+    hideSpinner();
+
+    newTab.print();
+    newTab.close();
+
     return;
   } catch (error) {
     hideSpinner();
-    console.error("Unexpected error:", error);
-    alert("予期しないエラーが発生しました。");
+
+    if (error instanceof CustomError && error.name === "NoDataError") {
+      alert(error.message);
+    } else {
+      console.error("帳票作成エラー:", error);
+      alert("帳票作成に失敗しました。もう一度時間をおいてからお試しください。");
+    }
+
     return;
   }
 }
