@@ -3,7 +3,6 @@
 
   let replace = {};
   let ledgerNames = [];
-  let filteredLatestRecords = [];
 
   const Params = new URLSearchParams(window.location.search);
   let companyId = Params.get("companyId");
@@ -311,92 +310,22 @@
     return state;
   });
 
-  let latestRecords = [];
   // *** kViewer event - view.index.show ***
   kviewer.events.on("records.show", async function (state) {
-    // 20250406 在籍者・退職者プルダウン表示
-    latestRecords = state.records;
-    filteredLatestRecords = latestRecords; // 初期状態では全てのレコードを表示
-    const headers = document.getElementsByClassName(
-      "flex h-full items-center",
-    )[0];
-
-    const nkrDropdown = create_nkr_dropdown();
-    headers.insertBefore(nkrDropdown, headers.firstChild);
-    const dropdown = document.getElementById("nkr-dropdown");
-
-    // 従業員基本情報から、在籍者・退職者の情報を取得。データとして入れる
-    const requestParam = {
-      id: 3202,
-      query_params: [
-        { key: "会社レコード番号", operator: "=", value: companyId },
-      ],
-      fields: ["社員No", "在籍状況"],
-    };
-    const employeeData = await get(requestParam);
-    console.log("Employee Data:", employeeData);
-
-    const employeeNumbersByStatus = buildEmployeeNumbersByStatus(
-      employeeData.records,
-    );
-
-    // 在籍者・退職者の情報をもとに、表示非表示を制御
-    const MAP = {
-      active: { value: ["在籍中"] },
-      active_retired: {
-        value: ["在籍中", "退職済み"],
-      },
-      retired: { value: ["退職済み"] },
-    };
-
-    // フィルター処理を関数化
-    const applyEmployeeFilter = () => {
-      const selectedKey = dropdown.value;
-      const selectedStatuses = MAP[selectedKey]?.value || [];
-
-      // 選択されたステータスに該当する社員Noを集める
-      const visibleEmployeeNos = new Set();
-      selectedStatuses.forEach((status) => {
-        if (employeeNumbersByStatus[status]) {
-          employeeNumbersByStatus[status].forEach((empNo) => {
-            visibleEmployeeNos.add(empNo);
-          });
-        }
+    let latestRecords = [];
+    let filteredLatestRecords = [];
+    if (ledgerNames[0] == "雇用契約書") {
+      await initEmployeeStatusFilter({
+        state,
+        companyId,
+        onFilterChange: (records) => {
+          filteredLatestRecords = records;
+        },
       });
-
-      //filteredLatestRecordsを更新
-      filteredLatestRecords = latestRecords.filter((r) => {
-        const empNo = String(r.kintoneRecord["社員No"]?.value);
-        return visibleEmployeeNos.has(empNo);
-      });
-
-      // 行ごとに表示/非表示を制御
-      document.querySelectorAll("tr.kv-list-record").forEach((row) => {
-        // 社員No を取得
-        const empNoCell = row.querySelector('[data-field-code="社員No"] div');
-
-        if (!empNoCell) {
-          return;
-        }
-
-        const empNo = empNoCell.textContent.trim();
-
-        // 選択されたステータスの社員No でない場合は非表示
-        if (!visibleEmployeeNos.has(empNo)) {
-          row.style.display = "none";
-        } else {
-          row.style.display = "";
-        }
-      });
-    };
-
-    // 初期状態で在籍中のみ表示
-    applyEmployeeFilter();
-
-    // プルダウン変更時のフィルター処理
-    dropdown.addEventListener("change", applyEmployeeFilter);
-
-    console.log("latestRecords:", latestRecords);
+    } else {
+      latestRecords = state.records;
+      filteredLatestRecords = latestRecords;
+    }
 
     if (replace.replaceGetStatus() === 0) {
       replace.replaceInitProcess(ledgerNames);
@@ -810,4 +739,143 @@ function create_nkr_dropdown() {
     </select>
   `;
   return nkrDropdown;
+}
+
+// 在籍者・退職者フィルター初期化
+async function initEmployeeStatusFilter({ state, companyId, onFilterChange }) {
+  let latestRecords = state.records;
+  let filteredLatestRecords = latestRecords;
+
+  const headers = document.getElementsByClassName(
+    "flex h-full items-center",
+  )[0];
+
+  const nkrDropdown = create_nkr_dropdown();
+  headers.insertBefore(nkrDropdown, headers.firstChild);
+
+  const dropdown = document.getElementById("nkr-dropdown");
+
+  // 社員状態取得
+  const employeeNumbersByStatus = await fetchEmployeeStatusMap(companyId);
+
+  const MAP = {
+    active: { value: ["在籍中"] },
+    active_retired: {
+      value: ["在籍中", "退職済み"],
+    },
+    retired: { value: ["退職済み"] },
+  };
+
+  const applyEmployeeFilter = () => {
+    const selectedKey = dropdown.value;
+
+    const selectedStatuses = MAP[selectedKey]?.value || [];
+
+    const visibleEmployeeNos = buildVisibleEmployeeSet(
+      selectedStatuses,
+      employeeNumbersByStatus,
+    );
+
+    filteredLatestRecords = filterLatestRecords(
+      latestRecords,
+      visibleEmployeeNos,
+    );
+
+    updateTableVisibility(visibleEmployeeNos);
+
+    updatePaginationCount(filteredLatestRecords.length);
+
+    if (onFilterChange) {
+      onFilterChange(filteredLatestRecords);
+    }
+  };
+
+  // 初期表示
+  applyEmployeeFilter();
+
+  // プルダウン変更した場合の処理
+  dropdown.addEventListener("change", applyEmployeeFilter);
+}
+
+// 選択された在籍状況に基づいて表示すべき社員番号のセットを構築
+async function fetchEmployeeStatusMap(companyId) {
+  const requestParam = {
+    id: 3202,
+    query_params: [
+      {
+        key: "会社レコード番号",
+        operator: "=",
+        value: companyId,
+      },
+    ],
+    fields: ["社員No", "在籍状況"],
+  };
+
+  const employeeData = await get(requestParam);
+
+  console.log("Employee Data:", employeeData);
+
+  return buildEmployeeNumbersByStatus(employeeData.records);
+}
+
+// 最新レコードをフィルタリングして、表示すべき社員番号のセットに基づいて絞り込む
+function buildVisibleEmployeeSet(statuses, employeeNumbersByStatus) {
+  const visibleEmployeeNos = new Set();
+
+  statuses.forEach((status) => {
+    if (employeeNumbersByStatus[status]) {
+      employeeNumbersByStatus[status].forEach((empNo) => {
+        visibleEmployeeNos.add(empNo);
+      });
+    }
+  });
+
+  return visibleEmployeeNos;
+}
+
+// 最新レコードを表示すべき社員番号のセットに基づいてフィルタリング
+function filterLatestRecords(latestRecords, visibleEmployeeNos) {
+  return latestRecords.filter((r) => {
+    const empNo = String(r.kintoneRecord["社員No"]?.value);
+    return visibleEmployeeNos.has(empNo);
+  });
+}
+
+// 該当社員Noの表示制御
+function updateTableVisibility(visibleEmployeeNos) {
+  document.querySelectorAll("tr.kv-list-record").forEach((row) => {
+    const empNoCell = row.querySelector('[data-field-code="社員No"] div');
+
+    if (!empNoCell) {
+      return;
+    }
+
+    const empNo = empNoCell.textContent.trim();
+
+    row.style.display = visibleEmployeeNos.has(empNo) ? "" : "none";
+  });
+}
+
+// ページネーションの件数表示を更新
+function updatePaginationCount(count) {
+  const pagination = document.querySelector(".kv-list-pagination");
+
+  if (!pagination) {
+    return;
+  }
+
+  const countTexts = pagination.querySelectorAll("p");
+
+  if (countTexts.length < 2) {
+    return;
+  }
+
+  if (count === 0) {
+    countTexts[0].textContent = "0件";
+    countTexts[1].textContent = "全0件";
+    return;
+  }
+
+  countTexts[0].textContent = `1-${count}件`;
+  countTexts[1].textContent = `全${count}件`;
 }
