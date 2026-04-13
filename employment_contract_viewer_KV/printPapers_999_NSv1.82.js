@@ -793,7 +793,12 @@ function isPaginationEnabled() {
   return false;
 }
 
+// 在籍者・退職者フィルター用のドロップダウンを作成
 function create_nkr_dropdown() {
+  if (document.getElementById("nkr-dropdown")) {
+    return null;
+  }
+
   const nkrDropdown = document.createElement("div");
   nkrDropdown.classList.add("text-m", "font-bold");
   nkrDropdown.innerHTML = `
