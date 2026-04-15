@@ -53,6 +53,7 @@ const LOCATION_HREF = window.location.href;
   const batch_params = Params.get("batch") || "";
   const userName = decodeURIComponent(Params.get("name")) || "";
   const userMailAddress = decodeURIComponent(Params.get("mailAddress")) || "";
+  const testDebug = Params.get("testDebug") || "";
 
   let title = document.getElementsByTagName("h1")[0].textContent;
   title = title.replaceAll("・", "");
@@ -361,7 +362,7 @@ const LOCATION_HREF = window.location.href;
   kviewer.events.on("records.show", async function (state) {
     let latestRecords = [];
     let filteredLatestRecords = [];
-    if (ledgerNames[0] == "雇用契約書") {
+    if (ledgerNames[0] == "雇用契約書" && testDebug !== "test") {
       await initEmployeeStatusFilter({
         state,
         companyId,
