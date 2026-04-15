@@ -7,9 +7,40 @@ const appId_paper = {
   解雇理由証明書: 3218,
   労働者名簿: 3218,
 };
+let prevDropdownStates = false;
+let prevDropdownValue = "";
+const LOCATION_HREF = window.location.href;
 
 (function () {
   "use strict";
+
+  // pushState/replaceStateをフック（urlの変更を検知）
+  (function (history) {
+    const pushState = history.pushState;
+    history.pushState = function () {
+      const result = pushState.apply(history, arguments);
+
+      // 遷移後にDOM操作したい場合は、1フレーム遅らせてから実行
+      setTimeout(() => {
+        const dropdown = document.getElementById("nkr-dropdown");
+        if (dropdown) applyDisplay(dropdown);
+      }, 0);
+
+      return result;
+    };
+
+    const replaceState = history.replaceState;
+    history.replaceState = function () {
+      const result = replaceState.apply(history, arguments);
+
+      setTimeout(() => {
+        const dropdown = document.getElementById("nkr-dropdown");
+        if (dropdown) applyDisplay(dropdown);
+      }, 0);
+
+      return result;
+    };
+  })(window.history);
 
   let replace = {};
   let ledgerNames = [];
@@ -793,6 +824,19 @@ function isPaginationEnabled() {
   return false;
 }
 
+// 検索適用の場合には、dropdownを""に設定する関数
+function applyDisplay(dropdown) {
+  const params = new URLSearchParams(window.location.search);
+  const additionalFilters = params.get("additionalFilters");
+  if (additionalFilters) {
+    prevDropdownValue = dropdown.value;
+    dropdown.value = "";
+    prevDropdownStates = true;
+  } else {
+    return;
+  }
+}
+
 // 在籍者・退職者フィルター用のドロップダウンを作成
 function create_nkr_dropdown() {
   if (document.getElementById("nkr-dropdown")) {
@@ -821,7 +865,9 @@ async function initEmployeeStatusFilter({ state, companyId, onFilterChange }) {
   )[0];
 
   const nkrDropdown = create_nkr_dropdown();
-  headers.insertBefore(nkrDropdown, headers.firstChild);
+  if (nkrDropdown) {
+    headers.insertBefore(nkrDropdown, headers.firstChild);
+  }
 
   const dropdown = document.getElementById("nkr-dropdown");
 
@@ -837,7 +883,15 @@ async function initEmployeeStatusFilter({ state, companyId, onFilterChange }) {
   };
 
   const applyEmployeeFilter = () => {
-    const selectedKey = dropdown.value;
+    let selectedKey = dropdown.value;
+    // dropdownが""の場合には前回の選択値、それから変更した場合にはリロードする
+    if (selectedKey === "") {
+      selectedKey = prevDropdownValue || "active"; // デフォルトは在籍者のみ
+    } else if (selectedKey !== "" && prevDropdownStates) {
+      window.location.href = LOCATION_HREF; // クエリパラメータをリセットしてリロード
+      prevDropdownStates = false;
+      selectedKey = prevDropdownValue;
+    }
 
     const selectedStatuses = MAP[selectedKey]?.value || [];
 
