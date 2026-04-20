@@ -21,7 +21,7 @@ class ReplaceValue {
     this.caller = caller === undefined ? "viewer" : caller;
     this.allowance_table = false;
     this.functionsObject = {
-      文字消去_1文字: function remove_oneword(i, value) {
+      文字消去_1文字: (i, value) => {
         try {
           if (value[i].length > 0) {
             value[i] = value[i].slice(0, -1);
@@ -33,7 +33,7 @@ class ReplaceValue {
           console.error(e);
         }
       },
-      日付: function date_array(i, value, replace_data, cer_name) {
+      日付: (i, value, replace_data, cer_name) => {
         try {
           if (replace_data.get(cer_name)["day_display"] == "YYYY年MM月DD日") {
             if (Object.prototype.toString.call(value[i]).includes("Date")) {
@@ -66,7 +66,7 @@ class ReplaceValue {
           console.error(e);
         }
       },
-      日付_年月のみ: function date_array(i, value, replace_data, cer_name) {
+      日付_年月のみ: (i, value, replace_data, cer_name) => {
         try {
           if (replace_data.get(cer_name)["day_display"] == "YYYY年MM月DD日") {
             if (Object.prototype.toString.call(value[i]).includes("Date")) {
@@ -110,7 +110,7 @@ class ReplaceValue {
           console.error(e);
         }
       },
-      金額: function addCommasToValue(i, value) {
+      金額: (i, value) => {
         try {
           if (!isNaN(value[i]) && value[i] !== "") {
             value[i] = parseFloat(value[i]).toLocaleString("en-US");
@@ -120,13 +120,7 @@ class ReplaceValue {
           console.error(e);
         }
       },
-      テーブル: function table_array(
-        i,
-        value,
-        replace_data,
-        cer_name,
-        displayValue,
-      ) {
+      テーブル: (i, value, replace_data, cer_name, displayValue) => {
         let jj;
         try {
           let tablefield_name = replace_data.get(cer_name)["table_field"];
@@ -144,13 +138,16 @@ class ReplaceValue {
             );
           }
           if (cer_name == "雇用契約書" || cer_name == "労働条件通知書") {
-            table_content = table_content.filter(
-              (index) =>
-                index.value &&
-                index.value["手当の額"] &&
-                index.value["手当の額"].value !== "0" &&
-                index.value["手当の額"].value !== "",
-            );
+            console.log("allowance_table:", this.allowance_table);
+            if (!this.allowance_table) {
+              table_content = table_content.filter(
+                (index) =>
+                  index.value &&
+                  index.value["手当の額"] &&
+                  index.value["手当の額"].value !== "0" &&
+                  index.value["手当の額"].value !== "",
+              );
+            }
           }
           let pp = 0;
           for (jj = i + 1; jj < tablefield_name.length - 1; jj++) {
@@ -175,13 +172,7 @@ class ReplaceValue {
         }
         return value;
       },
-      個別関数1: function original_function1(
-        i,
-        value,
-        replace_data,
-        cer_name,
-        displayValue,
-      ) {
+      個別関数1: (i, value, replace_data, cer_name, displayValue) => {
         try {
           let tablefield_name = replace_data.get(cer_name)["table_field"];
           let index = 0;
@@ -209,13 +200,7 @@ class ReplaceValue {
         }
         return value;
       },
-      個別関数2: function original_function2(
-        i,
-        value,
-        replace_data,
-        cer_name,
-        displayValue,
-      ) {
+      個別関数2: (i, value, replace_data, cer_name, displayValue) => {
         try {
           let tablefield_name = replace_data.get(cer_name)["table_field"];
           let index = 0;
@@ -243,13 +228,7 @@ class ReplaceValue {
         }
         return value;
       },
-      個別関数3: function original_function3(
-        i,
-        value,
-        replace_data,
-        cer_name,
-        displayValue,
-      ) {
+      個別関数3: (i, value, replace_data, cer_name, displayValue) => {
         try {
           let tablefield_name = replace_data.get(cer_name)["table_field"];
           let index = value[i];
@@ -369,6 +348,7 @@ class ReplaceValue {
       ["手当表示"],
     );
     return relay.RelayGetValueNormal().then((data) => {
+      console.log("allowanceTable data:", data);
       if (data.records.length > 0) {
         switch (data.records[0].手当表示.value) {
           case "表示する":
@@ -383,6 +363,7 @@ class ReplaceValue {
             break;
         }
       }
+      console.log("allowance_table set to:", this.allowance_table);
     });
   }
 
