@@ -52,7 +52,8 @@ const LOCATION_HREF = window.location.href;
   }
   const batch_params = Params.get("batch") || "";
   const userName = decodeURIComponent(Params.get("name")) || "";
-  const userMailAddress = decodeURIComponent(Params.get("mailAddress")) || "";
+  const userMailAddress =
+    decodeURIComponent(Params.get("originalMailAddress")) || "";
   const testDebug = Params.get("testDebug") || "";
 
   let title = document.getElementsByTagName("h1")[0].textContent;
